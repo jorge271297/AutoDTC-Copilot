@@ -2,9 +2,9 @@
 
 ## Contexto del proyecto
 
-Este proyecto es una aplicacion monolitica contruida en Node.js 24, React 19, TypeScript, Vite, Material UI, Emotion, React Router y oxlint.
+Este proyecto es una aplicacion web monolitica construida con Node.js 24, React 19, TypeScript, Vite, Material UI, Emotion, React Router y oxlint.
 
-La aplicacion es un cliente para un agente de inteligencia artificial basado en un modelo de lenguaje (LLM). Su responsabilidad principal es ofrecer la interfaz para que las personas interactuen con el agente; la logica del agente y las credenciales de los proveedores deben permanecer fuera del cliente.
+La aplicacion se desarrollara como un ejercicio practico y se publicara en Azure App Service. Funcionara como un cliente de chat, similar a GPT, que consumira desde Azure AI Foundry los servicios de un agente especializado basado en un modelo de lenguaje (LLM). No incluira un modulo de inicio de sesion. Su responsabilidad principal es ofrecer la interfaz para que las personas interactuen con el agente; la logica del agente y las credenciales de los proveedores deben permanecer fuera del cliente.
 
 Prioriza soluciones mantenibles, tipadas, accesibles y consistentes con la arquitectura existente del repositorio.
 
@@ -12,8 +12,12 @@ Prioriza soluciones mantenibles, tipadas, accesibles y consistentes con la arqui
 
 - Mantiene la aplicacion como un monolito modular. Organiza el codigo por funcionalidades y evita agregar microservicios o capas que no sean necesarias.
 - Separa la interfaz, el estado propio de cada funcionalidad y el acceso a servicios. Los componentes de interfaz no deben implementar directamente detalles de comunicacion HTTP o del proveedor del LLM.
-- Centraliza la comunicacion con el agente en un cliente de API tipado. Define contratos claros para solicitudes, respuestas y errores; implementa streaming solo si el flujo existente lo necesita.
-- Si el repositorio incluye un backend Node.js, utilizalo como limite seguro para validar solicitudes, gestionar secretos y comunicarse con el agente. No expongas credenciales en el codigo que se ejecuta en el navegador.
+- Centraliza la comunicacion con el agente en un cliente de API tipado. El backend debe integrarse con Azure AI Foundry; la aplicacion React solo debe comunicarse con el backend y nunca conectarse directamente a Foundry. Define contratos claros para solicitudes, respuestas y errores; implementa streaming solo si el flujo existente lo necesita.
+- Implementa el flujo principal como una experiencia de chat: entrada del usuario, envio al agente, presentacion de respuestas y estados de carga y error.
+- No agregues pantallas, rutas, proveedores de estado ni dependencias de autenticacion o inicio de sesion. La aplicacion no maneja cuentas de usuario ni vistas privadas.
+- Implementa la integracion con Azure AI Foundry en el backend Node.js, como limite seguro para validar solicitudes, autenticar llamadas, gestionar configuracion y comunicarse con el agente. No expongas credenciales ni endpoints sensibles en el codigo que se ejecuta en el navegador.
+- Agrega al `package.json` del backend los paquetes oficiales necesarios para la integracion con Microsoft Foundry: `@azure/ai-projects` y `@azure/identity`. Usa versiones compatibles vigentes y registra los cambios en el archivo de bloqueo. No agregues estos paquetes a las dependencias del cliente si solo se usan desde el servidor; consulta la [documentacion oficial de Microsoft Foundry SDK](https://learn.microsoft.com/en-us/azure/foundry/quickstarts/get-started-code?tabs=typescript) si el SDK o la API del agente requieren paquetes adicionales.
+- Usa `DefaultAzureCredential` de `@azure/identity` para autenticar el backend con Azure. Esta autenticacion de servicio a servicio no agrega inicio de sesion ni cuentas de usuario a la aplicacion. En Azure App Service, prefiere una identidad administrada con los permisos necesarios para acceder al proyecto de Foundry; en desarrollo local, sigue el flujo de autenticacion de Azure documentado. Guarda el endpoint del proyecto, el nombre o identificador del agente y cualquier configuracion por entorno, sin codificar secretos.
 - Conserva las responsabilidades separadas en el backend: rutas y controladores HTTP, logica de negocio e integracion con el agente.
 - Evita duplicar el estado de la conversacion. Mantén mensajes, estado de envio y errores en el nivel que corresponda al flujo de la aplicacion.
 - Adapta la siguiente estructura a los archivos existentes. Es una guia, no un requisito para crear carpetas vacias ni mover codigo sin necesidad:
@@ -38,7 +42,7 @@ Prioriza soluciones mantenibles, tipadas, accesibles y consistentes con la arqui
 └── vite.config.ts
 ```
 
-Si este repositorio tambien contiene el backend, puede organizarse bajo `server/`, separando rutas/controladores, servicios e integracion con el agente. Si el backend pertenece a otro servicio, no agregues esa carpeta al cliente.
+El backend Node.js que integra Azure AI Foundry puede organizarse bajo `server/`, separando rutas/controladores, servicios e integracion con el agente. Manten sus dependencias y configuracion diferenciadas de las del cliente cuando el proyecto lo requiera.
 
 ## Principios generales
 
@@ -54,6 +58,7 @@ Si este repositorio tambien contiene el backend, puede organizarse bajo `server/
 
 - Usa Node.js 24 como version objetivo.
 - Usa `npm` salvo que el repositorio ya incluya otro gestor de paquetes con lockfile.
+- Prepara y valida la aplicacion para su publicacion en Azure App Service usando la configuracion existente. No agregues infraestructura, recursos de Azure ni configuracion de despliegue nueva salvo que la tarea lo requiera.
 - Comandos principales:
   - `npm run dev` para desarrollo local.
   - `npm run build` para validar TypeScript y generar el build de Vite.
@@ -83,7 +88,7 @@ Si este repositorio tambien contiene el backend, puede organizarse bajo `server/
 
 - Usa `react-router-dom` siguiendo los patrones existentes del proyecto.
 - Mantiene las rutas centralizadas o consistentes con la estructura actual.
-- Protege vistas privadas con los componentes o hooks existentes antes de crear mecanismos nuevos.
+- No agregues proteccion de rutas ni vistas privadas: el alcance actual no incluye autenticacion. Revisa esta instruccion solo si el requerimiento cambia.
 - Evita rutas hardcodeadas repetidas; reutiliza constantes o helpers si ya existen.
 
 ## UI, accesibilidad y Material UI
