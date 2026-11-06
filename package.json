@@ -1,0 +1,41 @@
+{
+  "name": "proyecto-etapa2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x",
+    "npm": ">=10"
+  },
+  "workspaces": [
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names web,api \"vite\" \"npm run dev --workspace @proyecto-etapa2/server\"",
+    "build": "npm run build:web && npm run build:server",
+    "build:web": "tsc --noEmit && vite build",
+    "build:server": "npm run build --workspace @proyecto-etapa2/server",
+    "lint": "oxlint src server/src",
+    "preview": "vite preview",
+    "start": "npm run start --workspace @proyecto-etapa2/server",
+    "server:dev": "npm run dev --workspace @proyecto-etapa2/server"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^9.5.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "concurrently": "^10.0.6",
+    "oxlint": "^1.92.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.6"
+  }
+}
