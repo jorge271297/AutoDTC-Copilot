@@ -22,27 +22,56 @@ npm run dev
 
 Abre [http://localhost:3000](http://localhost:3000). `npm run dev` inicia un solo servidor de desarrollo Next.js.
 
-Para probar el chat, completa las variables de `.env.local` descritas abajo y autentica tu cuenta con:
+Para probar el chat, completa en `.env.local` las variables del proveedor que elegiste, descritas abajo. Solo si usas el agente de Foundry (`AZURE_AI_PROVIDER=foundry`), autentica localmente la cuenta con:
 
 ```powershell
 az login
 ```
 
+Con `AZURE_AI_PROVIDER=azure-openai`, configura las variables `AZURE_OPENAI_*`; no necesitas ejecutar `az login` para autenticar esa conexión.
+
 No agregues secretos a archivos versionados ni a variables con prefijo `NEXT_PUBLIC_`; ese prefijo hace que Next.js exponga el valor al navegador.
 
 ## Configuracion del agente de IA
 
-Completa `.env.local` en desarrollo o configura las mismas variables como **Application settings** en Azure App Service:
+Selecciona el proveedor con `AZURE_AI_PROVIDER` en `.env.local` o en **Application settings** de Azure App Service. Si no defines la variable, se conserva la integracion actual (`foundry`).
+
+### Opcion actual: agente de Microsoft Foundry
+
+Usa `AZURE_AI_PROVIDER=foundry` y configura:
 
 | Variable | Descripcion |
 | --- | --- |
 | `AZURE_AI_PROJECT_ENDPOINT` | Endpoint del proyecto de Microsoft Foundry. |
 | `AZURE_AI_AGENT_NAME` | Nombre de un agente existente en ese proyecto, asociado al modelo que se desea probar. |
 
-La plantilla versionada es [.env.example](./.env.example). La autenticacion se realiza con Microsoft Entra ID a traves de `DefaultAzureCredential`:
+La autenticacion se realiza con Microsoft Entra ID a traves de `DefaultAzureCredential`:
 
 - **Desarrollo local:** Azure CLI y `az login` con una cuenta autorizada para el proyecto.
 - **App Service:** habilita una identidad administrada para la aplicacion y otorga a esa identidad los permisos necesarios en el proyecto de Foundry. No guardes credenciales de Azure en `.env.local` ni en el codigo.
+
+### Opcion alterna: Azure OpenAI con clave
+
+Usa `AZURE_AI_PROVIDER=azure-openai` para llamar desde el servidor a un deployment de Azure OpenAI mediante Chat Completions. Esta opcion autentica la solicitud con una clave y no requiere que el usuario inicie sesion en Microsoft Entra ID:
+
+Esta opcion llama directamente al deployment del modelo; no ejecuta el agente existente de Foundry ni sus herramientas. Conserva las instrucciones automotrices de esta aplicacion y puede agregar contexto de Azure AI Search con las variables opcionales de abajo.
+
+| Variable | Descripcion |
+| --- | --- |
+| `AZURE_OPENAI_ENDPOINT` | Endpoint HTTPS del recurso de Azure OpenAI. |
+| `AZURE_OPENAI_API_KEY` | Clave de API; solo se lee en el servidor. |
+| `AZURE_OPENAI_DEPLOYMENT_NAME` | Nombre del deployment del modelo. |
+| `AZURE_OPENAI_API_VERSION` | Version de la API de Azure OpenAI. |
+
+Azure AI Search es opcional. Para usarlo, configura las tres variables; si alguna falta, el servidor reporta que la configuracion esta incompleta:
+
+| Variable | Descripcion |
+| --- | --- |
+| `AZURE_SEARCH_ENDPOINT` | Endpoint HTTPS del servicio Azure AI Search. |
+| `AZURE_SEARCH_KEY` | Clave de consulta de Search. |
+| `AZURE_SEARCH_INDEX` | Nombre del indice conectado al conocimiento. |
+
+La plantilla versionada es [.env.example](./.env.example). Mantén las claves en `.env.local` o en la configuracion protegida del hosting; nunca uses el prefijo `NEXT_PUBLIC_` para ellas. La ruta `/api/chat` es accesible desde el navegador sin inicio de sesion, por lo que un despliegue publico puede consumir cuota de Azure: agrega controles de uso en el hosting si necesitas limitar abuso.
 
 Las instrucciones del agente estan en `src/lib/chat.ts`: orientan las respuestas a codigos DTC/OBD-II, solicitan contexto del vehiculo cuando hace falta y priorizan recomendaciones de seguridad. Si el proveedor no esta configurado o falla, la API responde con un error controlado; no envia los detalles de configuracion al usuario.
 
@@ -53,7 +82,7 @@ Las instrucciones del agente estan en `src/lib/chat.ts`: orientan las respuestas
 1. La interfaz de `src/features/chat/ChatPage.tsx` recoge los mensajes.
 2. `src/services/chat.ts` los envia como JSON a `POST /api/chat`.
 3. `src/app/api/chat/route.ts` limita el tamano de la solicitud, valida el contrato y maneja los errores HTTP.
-4. `src/lib/chat-validation.ts` verifica los mensajes; `src/lib/chat.ts` consulta Microsoft Foundry usando las credenciales del servidor.
+4. `src/lib/chat-validation.ts` verifica los mensajes; `src/lib/chat.ts` selecciona el proveedor configurado y lo consulta desde el servidor.
 5. La API devuelve `{ "answer": "..." }`. El cliente muestra la respuesta como texto, sin insertar HTML proporcionado por el modelo.
 
 Ejemplo de solicitud:
@@ -132,7 +161,7 @@ Next.js requiere un servidor Node.js porque la aplicacion usa Route Handlers y a
 1. Usa Node.js 24 y despliega el repositorio con su `package-lock.json`.
 2. Instala dependencias con `npm ci` y compila con `npm run build`.
 3. Configura `npm start` como comando de inicio. Next.js escucha el puerto que le proporciona App Service.
-4. En **Configuration → Application settings**, agrega `AZURE_AI_PROJECT_ENDPOINT` y `AZURE_AI_AGENT_NAME`.
-5. Habilita la identidad administrada del App Service y dale acceso al proyecto de Microsoft Foundry.
+4. En **Configuration → Application settings**, configura `AZURE_AI_PROVIDER` y las variables del proveedor elegido.
+5. Si eliges `foundry`, habilita la identidad administrada del App Service y dale acceso al proyecto de Microsoft Foundry. Si eliges `azure-openai`, configura su clave como ajuste protegido y no configures una identidad solo para autenticar este proveedor.
 
 El servidor Next.js atiende la web y las rutas `/api` en el mismo proceso. El historial permanece en el navegador; App Service no necesita un volumen SQLite ni almacenamiento local para conservarlo.
