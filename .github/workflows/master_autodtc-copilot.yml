@@ -29,11 +29,20 @@ jobs:
           npm run build --if-present
           npm run test --if-present
 
+      - name: Prepare standalone deployment package
+        run: |
+          rm -rf deploy
+          mkdir -p deploy/.next
+          cp -a .next/standalone/. deploy/
+          cp -a .next/static deploy/.next/static
+          if [ -d public ]; then cp -a public deploy/public; fi
+          (cd deploy && zip -qr ../app.zip .)
+
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: app.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -61,5 +70,17 @@ jobs:
         with:
           app-name: 'AutoDTC-Copilot'
           slot-name: 'Production'
-          package: .
+          package: app.zip
+
+      - name: Configure App Service startup command
+        run: |
+          resource_group=$(az webapp list --query "[?name=='AutoDTC-Copilot'].resourceGroup | [0]" --output tsv)
+          if [ -z "$resource_group" ]; then
+            echo "No se encontró el grupo de recursos de AutoDTC-Copilot."
+            exit 1
+          fi
+          az webapp config set \
+            --resource-group "$resource_group" \
+            --name AutoDTC-Copilot \
+            --startup-file "node server.js"
           
