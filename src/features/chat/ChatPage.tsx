@@ -21,6 +21,8 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { sendChatMessage, type ChatMessage } from "../../services/chat";
 import { getHealth } from "../../services/health";
 import {
@@ -590,13 +592,80 @@ export function ChatPage() {
                             py: 1.5,
                           }}
                         >
-                          <Typography
-                            component="div"
-                            sx={{ overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}
-                            variant="body1"
-                          >
-                            {message.content}
-                          </Typography>
+                          {isUser ? (
+                            <Typography
+                              component="div"
+                              sx={{ overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}
+                              variant="body1"
+                            >
+                              {message.content}
+                            </Typography>
+                          ) : (
+                            <Box
+                              sx={{
+                                overflowWrap: "anywhere",
+                                "& > :first-of-type": { mt: 0 },
+                                "& > :last-child": { mb: 0 },
+                                "& p": { lineHeight: 1.7, mb: 1.5 },
+                                "& ul, & ol": {
+                                  mb: 1.5,
+                                  mt: 0,
+                                  pl: 3,
+                                },
+                                "& li + li": { mt: 0.5 },
+                                "& li > p": { mb: 0.5 },
+                                "& h1, & h2, & h3": {
+                                  fontWeight: 700,
+                                  lineHeight: 1.3,
+                                  mt: 2,
+                                  mb: 1,
+                                },
+                                "& h1": { fontSize: "1.35rem" },
+                                "& h2": { fontSize: "1.2rem" },
+                                "& h3": { fontSize: "1.05rem" },
+                                "& blockquote": {
+                                  borderLeft: 3,
+                                  borderColor: "primary.main",
+                                  color: "text.secondary",
+                                  ml: 0,
+                                  pl: 2,
+                                },
+                                "& pre": {
+                                  bgcolor: "action.hover",
+                                  borderRadius: 2,
+                                  overflowX: "auto",
+                                  p: 1.5,
+                                },
+                                "& :not(pre) > code": {
+                                  bgcolor: "action.hover",
+                                  borderRadius: 1,
+                                  px: 0.5,
+                                  py: 0.25,
+                                },
+                                "& table": {
+                                  borderCollapse: "collapse",
+                                  display: "block",
+                                  maxWidth: "100%",
+                                  overflowX: "auto",
+                                },
+                                "& th, & td": {
+                                  border: 1,
+                                  borderColor: "divider",
+                                  px: 1,
+                                  py: 0.75,
+                                  textAlign: "left",
+                                },
+                                "& a": {
+                                  color: "primary.main",
+                                  overflowWrap: "anywhere",
+                                },
+                              }}
+                            >
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {message.content}
+                              </ReactMarkdown>
+                            </Box>
+                          )}
                         </Paper>
                       </Stack>
                     );
@@ -612,7 +681,16 @@ export function ChatPage() {
             )}
           </Box>
 
-          <Box sx={{ bgcolor: "background.default", px: { xs: 1.5, sm: 3 }, pb: 2, pt: 1 }}>
+          <Box
+            sx={{
+              bgcolor: "background.default",
+              borderTop: 1,
+              borderColor: "divider",
+              px: { xs: 1.5, sm: 3 },
+              pb: { xs: 1.5, sm: 2 },
+              pt: { xs: 1.5, sm: 2 },
+            }}
+          >
             <Container maxWidth="md" disableGutters>
               {apiStatus.state === "unavailable" && (
                 <Alert severity="warning" sx={{ mb: 1.5 }}>
@@ -650,16 +728,25 @@ export function ChatPage() {
                   bgcolor: "background.paper",
                   border: 1,
                   borderColor: "divider",
-                  borderRadius: 4,
-                  boxShadow: "0 8px 30px rgba(28, 37, 54, 0.06)",
-                  p: 1.25,
+                  borderRadius: 3.5,
+                  boxShadow: "0 10px 32px rgba(28, 37, 54, 0.08)",
+                  overflow: "hidden",
+                  px: { xs: 1, sm: 1.5 },
+                  pt: { xs: 0.75, sm: 1 },
+                  pb: { xs: 0.75, sm: 1 },
+                  transition:
+                    "border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease",
+                  "&:focus-within": {
+                    borderColor: "primary.main",
+                    boxShadow: "0 0 0 3px rgba(23, 105, 170, 0.1), 0 12px 32px rgba(28, 37, 54, 0.1)",
+                  },
                 }}
               >
                 <TextField
                   fullWidth
                   aria-label="Escribe un mensaje sobre el vehículo"
                   disabled={isSending || storageStatus.state === "loading"}
-                  maxRows={5}
+                  maxRows={6}
                   multiline
                   onChange={(event) => setInput(event.target.value)}
                   onKeyDown={(event) => {
@@ -676,7 +763,16 @@ export function ChatPage() {
                       maxLength: 4000,
                       "aria-label": "Mensaje",
                     },
-                    input: { disableUnderline: true },
+                    input: {
+                      disableUnderline: true,
+                      sx: {
+                        alignItems: "flex-start",
+                        "& textarea": {
+                          lineHeight: 1.6,
+                          padding: "10px 8px 12px",
+                        },
+                      },
+                    },
                   }}
                 />
                 <Stack
@@ -684,13 +780,40 @@ export function ChatPage() {
                   sx={{
                     alignItems: "center",
                     justifyContent: "space-between",
-                    mt: 1,
+                    borderTop: 1,
+                    borderColor: "divider",
+                    minHeight: 48,
+                    pt: 0.75,
                     px: 0.5,
                   }}
                 >
-                  <Typography color="text.secondary" variant="caption">
-                    Enter para nueva línea · Ctrl+Enter para enviar
-                  </Typography>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: "center", minWidth: 0 }}
+                  >
+                    <Typography color="text.secondary" variant="caption">
+                      Enter para nueva línea
+                    </Typography>
+                    <Chip
+                      label="Ctrl + Enter"
+                      size="small"
+                      variant="outlined"
+                      sx={{
+                        borderColor: "divider",
+                        display: { xs: "none", sm: "inline-flex" },
+                        height: 24,
+                        "& .MuiChip-label": { px: 1, fontSize: 11 },
+                      }}
+                    />
+                    <Typography
+                      color="text.secondary"
+                      sx={{ display: { xs: "none", sm: "block" } }}
+                      variant="caption"
+                    >
+                      para enviar
+                    </Typography>
+                  </Stack>
                   <Tooltip title="Enviar mensaje">
                     <span>
                       <IconButton
@@ -701,12 +824,14 @@ export function ChatPage() {
                         sx={{
                           bgcolor: "primary.main",
                           color: "primary.contrastText",
-                          height: 38,
-                          width: 38,
-                          "&:hover": { bgcolor: "primary.dark" },
+                          height: 40,
+                          width: 40,
+                          transition: "transform 150ms ease, background-color 150ms ease",
+                          "&:hover": { bgcolor: "primary.dark", transform: "translateY(-1px)" },
                           "&.Mui-disabled": {
                             bgcolor: "action.disabledBackground",
                             color: "action.disabled",
+                            transform: "none",
                           },
                         }}
                       >
