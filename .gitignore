@@ -42,3 +42,6 @@ Thumbs.db
 
 # Test output
 coverage/
+
+# Deployment
+deploy.zip
