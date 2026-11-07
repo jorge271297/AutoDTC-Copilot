@@ -55,16 +55,37 @@ async function getFoundryChatResponse(messages: ChatMessage[]): Promise<string> 
 
   const project = new AIProjectClient(endpoint, new DefaultAzureCredential());
   const openAIClient = project.getOpenAIClient();
-  const result = await openAIClient.responses.create(
-    {
-      input: [{ role: "developer", content: automotiveInstructions }, ...messages],
-    },
-    {
-      body: {
-        agent: { name: agentName, type: "agent_reference" },
+  const conversation = await openAIClient.conversations.create({
+    items: [
+      { type: "message", role: "developer", content: automotiveInstructions },
+      ...messages.map((message) => ({
+        type: "message" as const,
+        role: message.role,
+        content: message.content,
+      })),
+    ],
+  });
+
+  let result;
+  try {
+    result = await openAIClient.responses.create(
+      { conversation: conversation.id },
+      {
+        body: {
+          agent_reference: { name: agentName, type: "agent_reference" },
+        },
       },
-    },
-  );
+    );
+  } finally {
+    try {
+      await openAIClient.conversations.delete(conversation.id);
+    } catch (error) {
+      console.error(
+        "No se pudo eliminar la conversacion temporal de Foundry.",
+        error instanceof Error ? error.name : "UnknownError",
+      );
+    }
+  }
 
   if (!result.output_text.trim()) {
     throw new Error("El agente no devolvio texto.");

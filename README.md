@@ -45,10 +45,16 @@ Usa `AZURE_AI_PROVIDER=foundry` y configura:
 | `AZURE_AI_PROJECT_ENDPOINT` | Endpoint del proyecto de Microsoft Foundry. |
 | `AZURE_AI_AGENT_NAME` | Nombre de un agente existente en ese proyecto, asociado al modelo que se desea probar. |
 
-La autenticacion se realiza con Microsoft Entra ID a traves de `DefaultAzureCredential`:
+El codigo recomendado que muestra Foundry usa Python (`azure-ai-projects` y `azure-identity`). Esta aplicacion esta escrita en TypeScript y usa los SDK equivalentes de JavaScript ya incluidos en `package.json`: `@azure/ai-projects` y `@azure/identity`. No es necesario instalar los paquetes de Python.
+
+La integracion en `src/lib/chat.ts` sigue el mismo flujo del ejemplo de Foundry: crea un `AIProjectClient` para el endpoint del proyecto con `DefaultAzureCredential`, obtiene el cliente OpenAI del proyecto, crea una conversacion, envia los mensajes al agente existente con `agent_reference` y elimina la conversacion temporal al terminar. Foundry requiere una conversacion para cada turno de estos agentes. El cliente se autentica desde el servidor; el navegador no recibe credenciales.
+
+En desarrollo, la autenticacion se realiza con Microsoft Entra ID a traves de `DefaultAzureCredential`:
 
 - **Desarrollo local:** Azure CLI y `az login` con una cuenta autorizada para el proyecto.
 - **App Service:** habilita una identidad administrada para la aplicacion y otorga a esa identidad los permisos necesarios en el proyecto de Foundry. No guardes credenciales de Azure en `.env.local` ni en el codigo.
+
+Si `az login` ya se realizo pero la llamada falla, confirma que Azure CLI usa el tenant y la suscripcion que contienen el proyecto y que la cuenta tiene el rol/permisos requeridos en Foundry. Reinicia `npm run dev` despues de cambiar `.env.local`.
 
 ### Opcion alterna: Azure OpenAI con clave
 
@@ -82,7 +88,7 @@ Las instrucciones del agente estan en `src/lib/chat.ts`: orientan las respuestas
 1. La interfaz de `src/features/chat/ChatPage.tsx` recoge los mensajes.
 2. `src/services/chat.ts` los envia como JSON a `POST /api/chat`.
 3. `src/app/api/chat/route.ts` limita el tamano de la solicitud, valida el contrato y maneja los errores HTTP.
-4. `src/lib/chat-validation.ts` verifica los mensajes; `src/lib/chat.ts` selecciona el proveedor configurado y lo consulta desde el servidor.
+4. `src/lib/chat-validation.ts` verifica los mensajes; `src/lib/chat.ts` selecciona el proveedor configurado y, para Foundry, crea una conversacion temporal y llama al agente desde el servidor.
 5. La API devuelve `{ "answer": "..." }`. El cliente muestra la respuesta como texto, sin insertar HTML proporcionado por el modelo.
 
 Ejemplo de solicitud:
@@ -161,7 +167,29 @@ Next.js requiere un servidor Node.js porque la aplicacion usa Route Handlers y a
 1. Usa Node.js 24 y despliega el repositorio con su `package-lock.json`.
 2. Instala dependencias con `npm ci` y compila con `npm run build`.
 3. Configura `npm start` como comando de inicio. Next.js escucha el puerto que le proporciona App Service.
-4. En **Configuration → Application settings**, configura `AZURE_AI_PROVIDER` y las variables del proveedor elegido.
-5. Si eliges `foundry`, habilita la identidad administrada del App Service y dale acceso al proyecto de Microsoft Foundry. Si eliges `azure-openai`, configura su clave como ajuste protegido y no configures una identidad solo para autenticar este proveedor.
+4. En **Configuration → Application settings**, configura las variables del proveedor elegido (ver abajo) y guarda los cambios.
+5. Si eliges `foundry`, configura la identidad administrada siguiendo los pasos de la siguiente seccion. Si eliges `azure-openai`, configura su clave como ajuste protegido; esa opcion no usa la identidad administrada para autenticarse.
 
 El servidor Next.js atiende la web y las rutas `/api` en el mismo proceso. El historial permanece en el navegador; App Service no necesita un volumen SQLite ni almacenamiento local para conservarlo.
+
+### Autenticacion de Foundry desde App Service
+
+En produccion, `DefaultAzureCredential` usa la identidad administrada del App Service. No configures `az login`, `AZURE_CLIENT_SECRET` ni credenciales de usuario en el sitio.
+
+1. En Azure Portal, abre tu **App Service** y ve a **Identity → System assigned**.
+2. Cambia **Status** a **On** y selecciona **Save**. Confirma la habilitacion y, si hace falta, copia el **Object (principal) ID** que muestra la pagina.
+3. Abre el recurso del proyecto de Foundry indicado por `AZURE_AI_PROJECT_ENDPOINT`. En **Access control (IAM)**, selecciona **Add → Add role assignment**.
+4. Selecciona el rol de datos **Azure AI User** (o el rol equivalente minimo que permita ejecutar el agente en tu configuracion de Foundry). En **Members**, elige **Managed identity**, selecciona tu suscripcion y el App Service; confirma que el principal corresponde al Object ID del paso anterior y completa la asignacion.
+5. En **App Service → Configuration → Application settings**, configura:
+
+   | Nombre | Valor |
+   | --- | --- |
+   | `AZURE_AI_PROVIDER` | `foundry` |
+   | `AZURE_AI_PROJECT_ENDPOINT` | Endpoint del proyecto de Foundry, con formato `https://<recurso>.services.ai.azure.com/api/projects/<proyecto>`. |
+   | `AZURE_AI_AGENT_NAME` | Nombre exacto del agente existente. |
+
+6. Guarda los ajustes y reinicia el App Service para que la aplicacion cargue la configuracion. Luego prueba el chat y revisa **Monitoring → Log stream** si falla.
+
+La asignacion de rol puede tardar unos minutos en propagarse. Asegurate de asignarla al recurso del proyecto de Foundry y a la identidad del App Service correcto, no a tu cuenta personal. No agregues `AZURE_OPENAI_API_KEY` para este flujo.
+
+Para usar en cambio el proveedor directo `azure-openai`, configura `AZURE_AI_PROVIDER=azure-openai` y los ajustes `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT_NAME` y `AZURE_OPENAI_API_VERSION`. Guarda la clave como ajuste de aplicacion protegido y reinicia el sitio; esta opcion llama al modelo directamente, no al agente de Foundry.
